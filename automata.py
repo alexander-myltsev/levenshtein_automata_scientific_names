@@ -1,4 +1,6 @@
 import bisect
+import re
+import latin_stemmer
 
 
 class NFA(object):
@@ -137,7 +139,9 @@ class DFA(object):
         return None
 
 
-def levenshtein_automata(term, k):
+def levenshtein_automata(term):
+    k = 2
+
     nfa = NFA((0, 0))
     for i, c in enumerate(term):
         for e in range(k + 1):
@@ -157,18 +161,7 @@ def levenshtein_automata(term, k):
     return nfa
 
 
-def find_all_matches(word, k, lookup_func):
-    """Uses lookup_func to find all words within levenshtein distance k of word.
-
-    Args:
-      word: The word to look up
-      k: Maximum edit distance
-      lookup_func: A single argument function that returns the first word in the
-        database that is greater than or equal to the input argument.
-    Yields:
-      Every matching word within levenshtein distance k from the database.
-    """
-    lev = levenshtein_automata(word, k).to_dfa()
+def __find_all_matches(lev, lookup_func):
     match = lev.next_valid_string(u'\0')
     while match:
         nxt = lookup_func(match)
@@ -178,3 +171,49 @@ def find_all_matches(word, k, lookup_func):
             yield match
             nxt = nxt + u'\0'
         match = lev.next_valid_string(nxt)
+
+
+def stemmize_word(word):
+    word_parts = word.split(' ')
+    word_stemmized = ' '.join(latin_stemmer.stemmize(word_part).stem for word_part in word_parts)
+    return word_stemmized
+
+
+def __match_by_stem(word, stem_words):
+    word_stem = stemmize_word(word)
+    lev = levenshtein_automata(word_stem).to_dfa()
+    res = list(__find_all_matches(lev, stem_words))
+    return res
+
+
+def __match_by_full(word, full_words):
+    lev = levenshtein_automata(word).to_dfa()
+    res = list(__find_all_matches(lev, full_words))
+    return res
+
+
+def find_all_matches(word, full_words, stem_words, stem_to_words):
+    """Uses lookup_func to find all words within levenshtein distance k of word.
+
+    Args:
+      word: The word to look up
+      lookup_func: A single argument function that returns the first word in the
+        database that is greater than or equal to the input argument.
+    Yields:
+      Every matching word within levenshtein distance k from the database.
+    """
+    word = re.sub('\s+', ' ', word)
+    print(word)
+
+    matches_by_stem = __match_by_stem(word, stem_words)
+    if len(matches_by_stem) > 0:
+        res = [
+            w
+            for match_by_stem in matches_by_stem
+            for w in stem_to_words[match_by_stem]
+        ]
+    else:
+        res = __match_by_full(word, full_words)
+
+    res = [r[0].upper() + r[1:] for r in res]
+    return res
