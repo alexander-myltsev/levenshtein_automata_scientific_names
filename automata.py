@@ -220,10 +220,11 @@ class Matcher(object):
 
 
 class Finder:
-    def __init__(self, words):
+    def __init__(self, words_datasources):
         self.stem_to_words = {}
+        self.words_to_datasources = words_datasources
         words_stems = []
-        for word in words:
+        for word, data_sources in words_datasources.iteritems():
             word_stemmized = self.stemmize_word(word)
 
             stem_words_set = self.stem_to_words.get(word_stemmized, set())
@@ -232,9 +233,11 @@ class Finder:
 
             words_stems.append(word_stemmized)
 
-        words.sort()
+        self.words = list(words_datasources.keys())
+        self.words.sort()
+        self.words = Matcher(self.words)
+
         words_stems.sort()
-        self.words = Matcher(words)
         self.words_stems = Matcher(words_stems)
 
     def stemmize_word(self, word):
@@ -242,50 +245,69 @@ class Finder:
         word_stemmized = ' '.join(LatinStemmer.stemmize(word_part).stem for word_part in word_parts)
         return word_stemmized
 
-    def __find_all_matches(self, lev, lookup_func):
+    def __find_all_matches(self, lev, lookup_func, lookup_ds):
         match = lev.next_valid_string(u'\0')
         while match:
             nxt = lookup_func(match)
             if not nxt:
                 return
             if match == nxt:
-                yield match
+                if lookup_ds(match):
+                    yield match
                 nxt = nxt + u'\0'
             match = lev.next_valid_string(nxt)
 
-    def __match_by_stem(self, word):
+    def __match_by_stem(self, word, data_sources):
         word_stem = self.stemmize_word(word)
         lev = levenshtein_automata(word_stem).to_dfa()
-        res = list(self.__find_all_matches(lev, self.words_stems))
+
+        def lookup_ds(stem):
+            if len(data_sources) == 0:
+                return True
+            s = set(
+                ds
+                for w in self.stem_to_words[stem]
+                for ds in self.words_to_datasources[w]
+            )
+            intersect = s.intersection(data_sources)
+            return len(intersect) > 0
+
+        res = list(self.__find_all_matches(lev, self.words_stems, lookup_ds))
         return res
 
-    def __match_by_full(self, word):
+    def __match_by_full(self, word, data_sources):
         lev = levenshtein_automata(word).to_dfa()
-        res = list(self.__find_all_matches(lev, self.words))
+
+        def lookup_ds(w):
+            if len(data_sources) == 0:
+                return True
+            s = set(ds for ds in self.words_to_datasources[w])
+            intersect = s.intersection(data_sources)
+            return len(intersect) > 0
+
+        res = list(self.__find_all_matches(lev, self.words, lookup_ds))
         return res
 
-    def find_all_matches(self, word):
-        """Uses lookup_func to find all words within levenshtein distance k of word.
-
-        Args:
-          word: The word to look up
-          lookup_func: A single argument function that returns the first word in the
-            database that is greater than or equal to the input argument.
-        Yields:
-          Every matching word within levenshtein distance k from the database.
-        """
-        word = re.sub('\s+', ' ', word)
+    def find_all_matches(self, word, data_sources=set()):
+        word = re.sub('\s+', ' ', word).lower()
         print(word)
 
-        matches_by_stem = self.__match_by_stem(word)
+        matches_by_stem = self.__match_by_stem(word, data_sources)
         if len(matches_by_stem) > 0:
             res = [
                 w
                 for match_by_stem in matches_by_stem
                 for w in self.stem_to_words[match_by_stem]
             ]
+
+            if len(data_sources) > 0:
+                res = [r for r in res if len(data_sources.intersection(self.words_to_datasources[r]))]
+
         else:
-            res = self.__match_by_full(word)
+            res = self.__match_by_full(word, data_sources)
+
+            if len(data_sources) > 0:
+                res = [r for r in res if len(data_sources.intersection(self.words_to_datasources[r]))]
 
         res = [r[0].upper() + r[1:] for r in res]
         return res
