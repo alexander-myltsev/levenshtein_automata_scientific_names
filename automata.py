@@ -224,7 +224,10 @@ class Finder:
         self.stem_to_words = {}
         self.words_to_datasources = words_datasources
         words_stems = []
-        for word, data_sources in words_datasources.iteritems():
+        for idx, (word, data_sources) in enumerate(words_datasources.iteritems()):
+            if idx % 100000 == 0:
+                print(idx)
+
             word_stemmized = self.stemmize_word(word)
 
             stem_words_set = self.stem_to_words.get(word_stemmized, set())
