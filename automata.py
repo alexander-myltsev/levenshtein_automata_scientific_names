@@ -292,7 +292,7 @@ class Finder:
         return res
 
     def find_all_matches(self, word, data_sources=set()):
-        word = re.sub('\s+', ' ', word).lower()
+        word = re.sub('\s+', ' ', word.strip()).lower()
         print(word)
 
         matches_by_stem = self.__match_by_stem(word, data_sources)
