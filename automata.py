@@ -295,22 +295,34 @@ class Finder:
         word = re.sub('\s+', ' ', word.strip()).lower()
         print(word)
 
-        matches_by_stem = self.__match_by_stem(word, data_sources)
-        if len(matches_by_stem) > 0:
-            res = [
-                w
-                for match_by_stem in matches_by_stem
-                for w in self.stem_to_words[match_by_stem]
-            ]
-
-            if len(data_sources) > 0:
-                res = [r for r in res if len(data_sources.intersection(self.words_to_datasources[r]))]
+        if ' ' not in word:
+            print('single word match')
+            if word in self.words_to_datasources:
+                res = [word]
+            else:
+                res = []
 
         else:
-            res = self.__match_by_full(word, data_sources)
+            matches_by_stem = self.__match_by_stem(word, data_sources)
+            if len(matches_by_stem) > 0:
+                res = [
+                    w
+                    for match_by_stem in matches_by_stem
+                    for w in self.stem_to_words[match_by_stem]
+                ]
 
-            if len(data_sources) > 0:
-                res = [r for r in res if len(data_sources.intersection(self.words_to_datasources[r]))]
+                if len(data_sources) > 0:
+                    res = [r for r in res
+                           if len(data_sources.intersection(self.words_to_datasources[r]))]
+
+            else:
+                res = self.__match_by_full(word, data_sources)
+
+                if len(data_sources) > 0:
+                    res = [r for r in res
+                           if len(data_sources.intersection(self.words_to_datasources[r]))]
 
         res = [r[0].upper() + r[1:] for r in res]
+
+        print 'res:', res
         return res
