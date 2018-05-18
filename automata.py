@@ -219,7 +219,7 @@ class Matcher(object):
             return None
 
 
-def stemmize_word(word):
+def _stemmize_word(word):
     word_parts = word.split(' ')
     word_stemmized = ' '.join(LatinStemmer.stemmize(word_part).stem for word_part in word_parts)
     return word_stemmized
@@ -277,8 +277,9 @@ class MatcherByStem:
         res = list(_find_all_matches(lev, self.bisect_by_word_stems, lookup_ds))
         return res
 
-    def transform(self, word):
-        word_stemmized = stemmize_word(word.lower())
+    @staticmethod
+    def transform(word):
+        word_stemmized = _stemmize_word(word.lower())
         return word_stemmized
 
     def lookup(self, word_transformed):
@@ -292,7 +293,7 @@ class MatcherByVerbatim:
         self.words_to_datasources = words_to_datasources
         self.words_verbatims_to_words = {}
 
-        for idx, (word, data_sources) in enumerate(words_to_datasources.iteritems()):
+        for idx, word in enumerate(words_to_datasources.keys()):
             if idx > 0 and idx % 100000 == 0:
                 print(idx)
 
@@ -311,17 +312,20 @@ class MatcherByVerbatim:
         word_verbatim = self.transform(word)
         lev = levenshtein_automata(word_verbatim).to_dfa()
 
-        def lookup_ds(w):
+        def lookup_ds(w_verb):
             if len(data_sources) == 0:
                 return True
-            s = set(ds for ds in self.words_to_datasources[w])
+            s = set(ds
+                    for w_orig in self.words_verbatims_to_words[w_verb]
+                    for ds in self.words_to_datasources[w_orig])
             intersect = s.intersection(data_sources)
             return len(intersect) > 0
 
         res = list(_find_all_matches(lev, self.bisect_by_word_verbatims, lookup_ds))
         return res
 
-    def transform(self, word):
+    @staticmethod
+    def transform(word):
         word_verbatim = word.lower().replace('j', 'i').replace('v', 'u')
         return word_verbatim
 
@@ -336,7 +340,7 @@ class MatcherByGenusOnly:
         self.words_to_datasources = words_to_datasources
         self.words_genus_only_to_words = {}
 
-        for idx, (word, data_sources) in enumerate(words_to_datasources.iteritems()):
+        for idx, word in enumerate(words_to_datasources.keys()):
             if idx > 0 and idx % 100000 == 0:
                 print(idx)
 
@@ -355,7 +359,8 @@ class MatcherByGenusOnly:
         res = self.words_genus_only_to_words.get(word_transformed, set())
         return [r.lower() for r in res]
 
-    def transform(self, word):
+    @staticmethod
+    def transform(word):
         word_verbatim = word.lower().replace('j', 'i').replace('v', 'u')
         return word_verbatim
 
