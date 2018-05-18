@@ -376,7 +376,7 @@ class Finder:
         self.matcher_by_verbatim = MatcherByVerbatim(words_to_datasources)
         self.matcher_by_genus_only = MatcherByGenusOnly(words_to_datasources)
 
-    def find_all_matches(self, word, data_sources=set()):
+    def __pipeline(self, word, data_sources=set()):
         word_cleaned = re.sub('\s+', ' ', word.strip()).lower()
         print 'request: ', word_cleaned, '|', data_sources
 
@@ -422,3 +422,12 @@ class Finder:
 
         print 'res:', res
         return res
+
+    def find_all_matches(self, word, data_sources=set()):
+        import traceback
+        try:
+            return self.__pipeline(word, data_sources)
+        except Exception as ex:
+            print ex
+            traceback.print_exc()
+            return []
