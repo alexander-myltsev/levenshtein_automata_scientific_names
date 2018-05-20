@@ -368,6 +368,10 @@ class MatcherByGenusOnly:
         res = self.words_genus_only_to_words.get(word_transformed, set())
         return res
 
+    @staticmethod
+    def verify(word_cleaned):
+        return ' ' not in word_cleaned
+
 
 class MatcherByLetter:
     def __init__(self, words_to_datasources):
@@ -442,8 +446,8 @@ class Finder:
         print 'request: ', word_cleaned, '|', data_sources
 
         if not self.matcher_by_letter_context:
-            matches_genus_only = self.matcher_by_genus_only.match(word_cleaned, data_sources)
-            if matches_genus_only:
+            if MatcherByGenusOnly.verify(word_cleaned):
+                matches_genus_only = self.matcher_by_genus_only.match(word_cleaned, data_sources)
                 print 'single word match', matches_genus_only
                 res = [
                     w
