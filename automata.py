@@ -369,56 +369,126 @@ class MatcherByGenusOnly:
         return res
 
 
-class Finder:
+class MatcherByLetter:
     def __init__(self, words_to_datasources):
+        print "Constructing MatcherByLetter"
+
+        self.words_to_datasources = words_to_datasources
+        self.letter_to_matching = {}
+
+        for idx, word in enumerate(words_to_datasources.keys()):
+            if idx > 0 and idx % 100000 == 0:
+                print(idx)
+
+            letter, word_rest = self.transform(word)
+            if letter not in self.letter_to_matching:
+                self.letter_to_matching[letter] = {'words_to_datasources': {}, 'words_rest_to_words_full': {}}
+
+            if word_rest is not None:
+                self.letter_to_matching[letter]['words_to_datasources'][word_rest] = words_to_datasources[word]
+                if word_rest not in self.letter_to_matching[letter]['words_rest_to_words_full']:
+                    self.letter_to_matching[letter]['words_rest_to_words_full'][word_rest] = set()
+                self.letter_to_matching[letter]['words_rest_to_words_full'][word_rest].add(word)
+
+        for letter in self.letter_to_matching.keys():
+            print "Constructing MatcherByLetter | letter", letter
+            finder = Finder(self.letter_to_matching[letter]['words_to_datasources'],
+                            matcher_by_letter_context=True)
+            self.letter_to_matching[letter]['finder'] = finder
+
+    def match(self, word, data_sources):
+        letter, word_rest = self.transform(word)
+        if letter not in self.letter_to_matching:
+            return []
+        matching = self.letter_to_matching[letter]
+        res = matching['finder'].find_all_matches(word_rest, data_sources)
+        res = [
+            word_full
+            for r in res
+            for word_full in matching['words_rest_to_words_full'][r]
+        ]
+        if data_sources:
+            res = [r for r in res
+                   if len(data_sources.intersection(self.words_to_datasources[r]))]
+        return res
+
+    @staticmethod
+    def transform(word):
+        word_parts = word.split(' ')
+        word_rest = ' '.join(word_parts[1:])
+
+        letter = word[0].lower()
+        word_rest = word_rest if len(word_rest) > 0 else None
+        return letter, word_rest
+
+    @staticmethod
+    def verify(word):
+        word_parts = word.split(' ')
+        return len(word_parts) > 0 and len(word_parts[0]) == 2 and word_parts[0].endswith('.')
+
+
+class Finder:
+    def __init__(self, words_to_datasources, matcher_by_letter_context=False):
         self.words_to_datasources = words_to_datasources
         self.matcher_by_stem = MatcherByStem(words_to_datasources)
         self.matcher_by_verbatim = MatcherByVerbatim(words_to_datasources)
-        self.matcher_by_genus_only = MatcherByGenusOnly(words_to_datasources)
+        self.matcher_by_letter_context = matcher_by_letter_context
+        if not self.matcher_by_letter_context:
+            self.matcher_by_genus_only = MatcherByGenusOnly(words_to_datasources)
+            self.matcher_by_letter = MatcherByLetter(words_to_datasources)
 
     def __pipeline(self, word, data_sources=set()):
         word_cleaned = re.sub('\s+', ' ', word.strip()).lower()
         print 'request: ', word_cleaned, '|', data_sources
 
-        matches_genus_only = self.matcher_by_genus_only.match(word_cleaned, data_sources)
-        if matches_genus_only:
-            print 'single word match', matches_genus_only
+        if not self.matcher_by_letter_context:
+            matches_genus_only = self.matcher_by_genus_only.match(word_cleaned, data_sources)
+            if matches_genus_only:
+                print 'single word match', matches_genus_only
+                res = [
+                    w
+                    for match_genus_only in matches_genus_only
+                    for w in self.matcher_by_genus_only.lookup(match_genus_only)
+                ]
+                print 'single word match (filtered)', res
+                return res
+
+            if MatcherByLetter.verify(word_cleaned):
+                self.matcher_by_letter.transform(word_cleaned)
+
+                matches_by_letter = self.matcher_by_letter.match(word_cleaned, data_sources)
+                print 'matches_by_letter', matches_by_letter
+                return matches_by_letter
+
+            return []
+
+        matches_by_stem = self.matcher_by_stem.match(word_cleaned, data_sources)
+        print 'matches_by_stem', matches_by_stem
+        if matches_by_stem:
             res = [
                 w
-                for match_genus_only in matches_genus_only
-                for w in self.matcher_by_genus_only.lookup(match_genus_only)
+                for match_by_stem in matches_by_stem
+                for w in self.matcher_by_stem.lookup(match_by_stem)
             ]
-            print 'single word match (filtered)', res
-            return res
+
+            if data_sources:
+                res = [r for r in res
+                       if len(data_sources.intersection(self.words_to_datasources[r]))]
+                print 'matches_by_stem (filtered)', res
 
         else:
-            matches_by_stem = self.matcher_by_stem.match(word_cleaned, data_sources)
-            print 'matches_by_stem', matches_by_stem
-            if matches_by_stem:
-                res = [
-                    w
-                    for match_by_stem in matches_by_stem
-                    for w in self.matcher_by_stem.lookup(match_by_stem)
-                ]
+            matches_by_verbatim = self.matcher_by_verbatim.match(word_cleaned, data_sources)
+            res = [
+                w
+                for match_by_verbatim in matches_by_verbatim
+                for w in self.matcher_by_verbatim.lookup(match_by_verbatim)
+            ]
+            print 'matches_by_verbatim', matches_by_verbatim
 
-                if data_sources:
-                    res = [r for r in res
-                           if len(data_sources.intersection(self.words_to_datasources[r]))]
-                    print 'matches_by_stem (filtered)', res
-
-            else:
-                matches_by_verbatim = self.matcher_by_verbatim.match(word_cleaned, data_sources)
-                res = [
-                    w
-                    for match_by_verbatim in matches_by_verbatim
-                    for w in self.matcher_by_verbatim.lookup(match_by_verbatim)
-                ]
-                print 'matches_by_verbatim', matches_by_verbatim
-
-                if data_sources:
-                    res = [r for r in res
-                           if len(data_sources.intersection(self.words_to_datasources[r]))]
-                    print 'matches_by_verbatim (filtered)', res
+            if data_sources:
+                res = [r for r in res
+                       if len(data_sources.intersection(self.words_to_datasources[r]))]
+                print 'matches_by_verbatim (filtered)', res
 
         print 'res:', res
         return res
