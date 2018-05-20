@@ -357,7 +357,10 @@ class MatcherByGenusOnly:
     def match(self, word, data_sources):
         word_transformed = self.transform(word)
         res = self.words_genus_only_to_words.get(word_transformed, set())
-        return [r.lower() for r in res]
+        if data_sources:
+            res = [r for r in res
+                   if len(data_sources.intersection(self.words_to_datasources[r]))]
+        return res
 
     @staticmethod
     def transform(word):
