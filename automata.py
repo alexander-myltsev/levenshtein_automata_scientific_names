@@ -263,12 +263,16 @@ class MatcherByStem:
         word_stem = self.transform(word)
         lev = levenshtein_automata(word_stem).to_dfa()
 
-        def lookup_ds(stem):
+        def lookup_ds(word_stem_candidate):
+            if not _matching_threshold(word_stem, word_stem_candidate):
+                return False
+
             if len(data_sources) == 0:
                 return True
+
             s = set(
                 ds
-                for w in self.word_stemmized_to_words[stem]
+                for w in self.word_stemmized_to_words[word_stem_candidate]
                 for ds in self.words_to_datasources[w]
             )
             intersect = s.intersection(data_sources)
@@ -312,11 +316,15 @@ class MatcherByVerbatim:
         word_verbatim = self.transform(word)
         lev = levenshtein_automata(word_verbatim).to_dfa()
 
-        def lookup_ds(w_verb):
+        def lookup_ds(word_verbatim_candidate):
+            if not _matching_threshold(word_verbatim, word_verbatim_candidate):
+                return False
+
             if len(data_sources) == 0:
                 return True
+
             s = set(ds
-                    for w_orig in self.words_verbatims_to_words[w_verb]
+                    for w_orig in self.words_verbatims_to_words[word_verbatim_candidate]
                     for ds in self.words_to_datasources[w_orig])
             intersect = s.intersection(data_sources)
             return len(intersect) > 0
