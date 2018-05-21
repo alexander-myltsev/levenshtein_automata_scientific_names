@@ -225,6 +225,51 @@ def _stemmize_word(word):
     return word_stemmized
 
 
+def _levenshtein(s1, s2):
+    if len(s1) < len(s2):
+        return _levenshtein(s2, s1)
+    if not s1:
+        return len(s2)
+
+    previous_row = xrange(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = \
+                previous_row[j + 1] + 1  # j+1 instead of j since previous_row and current_row are one character longer
+            deletions = current_row[j] + 1  # than s2
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def _matching_threshold(word_input, word_candidate):
+    if word_input.count(' ') != word_candidate.count(' '):
+        return False
+
+    word_input_parts = word_input.split(' ')
+    word_candidate_parts = word_candidate.split(' ')
+
+    for idx in range(len(word_input_parts)):
+        word_input_part_len = len(word_input_parts[idx])
+        if word_input_part_len < 6:
+            allowed_edits = 0
+        elif word_input_part_len < 11:
+            allowed_edits = 1
+        else:
+            allowed_edits = 2
+
+        actual_edits = _levenshtein(word_input_parts[idx], word_candidate_parts[idx])
+        print '_matching_threshold>', word_input_parts[idx], '|', word_candidate_parts[idx], \
+              '||', allowed_edits, '-', actual_edits
+        if actual_edits > allowed_edits:
+            return False
+
+    return True
+
+
 def _find_all_matches(lev, lookup_func, lookup_ds):
     match = lev.next_valid_string(u'\0')
     while match:
