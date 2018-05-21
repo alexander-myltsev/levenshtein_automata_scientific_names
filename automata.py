@@ -467,8 +467,6 @@ class Finder:
                 print 'matches_by_letter', matches_by_letter
                 return matches_by_letter
 
-            return []
-
         matches_by_stem = self.matcher_by_stem.match(word_cleaned, data_sources)
         print 'matches_by_stem', matches_by_stem
         if matches_by_stem:
