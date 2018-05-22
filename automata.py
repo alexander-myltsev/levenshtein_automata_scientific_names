@@ -1,5 +1,6 @@
 import bisect
 import re
+from itertools import combinations
 
 
 class NFA(object):
@@ -245,9 +246,9 @@ def _levenshtein(s1, s2):
     return previous_row[-1]
 
 
-def _matching_threshold(word_input, word_candidate):
-    if word_input.count(' ') != word_candidate.count(' '):
-        return False
+def _matching_threshold_helper(word_input, word_candidate):
+    print '_matching_threshold_helper>', word_input, '|', word_candidate
+    assert word_input.count(' ') == word_candidate.count(' ')
 
     word_input_parts = word_input.split(' ')
     word_candidate_parts = word_candidate.split(' ')
@@ -262,12 +263,46 @@ def _matching_threshold(word_input, word_candidate):
             allowed_edits = 2
 
         actual_edits = _levenshtein(word_input_parts[idx], word_candidate_parts[idx])
-        print '_matching_threshold>', word_input_parts[idx], '|', word_candidate_parts[idx], \
+        print '_matching_threshold_helper_iter>', word_input_parts[idx], '|', word_candidate_parts[idx], \
               '||', allowed_edits, '-', actual_edits
         if actual_edits > allowed_edits:
             return False
 
     return True
+
+
+def _matching_threshold(word_input, word_candidate):
+    word_input_spaces = word_input.count(' ')
+    word_candidate_spaces = word_candidate.count(' ')
+
+    if word_input_spaces == word_candidate_spaces:
+        return _matching_threshold_helper(word_input, word_candidate)
+    else:
+        word_long, word_short, word_long_spaces, word_short_spaces = \
+            (word_input, word_candidate, word_input_spaces, word_candidate_spaces) \
+            if word_input_spaces > word_candidate_spaces \
+            else (word_candidate, word_input, word_candidate_spaces, word_input_spaces)
+
+        word_long_parts = word_long.split(' ')
+        for comb in combinations(range(word_long_spaces), word_short_spaces):
+            word_long_idx = 0
+            word_long_new = ''
+            for c in comb:
+                while word_long_idx <= c:
+                    word_long_new += word_long_parts[word_long_idx]
+                    word_long_idx += 1
+                word_long_new += ' '
+            word_long_new += ''.join(word_long_parts[word_long_idx:])
+
+            word_input_new, word_candidate_new = \
+                (word_long_new, word_short) \
+                if word_input_spaces > word_candidate_spaces \
+                else (word_short, word_long_new)
+
+            if _matching_threshold_helper(word_input_new, word_candidate_new):
+                return True
+
+    return False
 
 
 def _find_all_matches(lev, lookup_func, lookup_ds):
