@@ -220,12 +220,6 @@ class Matcher(object):
             return None
 
 
-def _stemmize_word(word):
-    word_parts = word.split(' ')
-    word_stemmized = ' '.join(LatinStemmer.stemmize(word_part).stem for word_part in word_parts)
-    return word_stemmized
-
-
 def _levenshtein(s1, s2):
     if len(s1) < len(s2):
         return _levenshtein(s2, s1)
@@ -367,8 +361,18 @@ class MatcherByStem:
         return res
 
     @staticmethod
+    def __stemmize_word(word):
+        word_parts = word.split(' ')
+        if len(word_parts) < 2:
+            return word
+        else:
+            word_stemmized = \
+                word_parts[0] + ' ' + ' '.join(LatinStemmer.stemmize(word_part).stem for word_part in word_parts[1:])
+            return word_stemmized
+
+    @staticmethod
     def transform(word):
-        word_stemmized = _stemmize_word(word.lower())
+        word_stemmized = MatcherByStem.__stemmize_word(word.lower())
         return word_stemmized
 
     def lookup(self, word_transformed):
